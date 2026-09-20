@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OmniCast AI Studio - Multi-Platform Video Repurposing</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0b0f17;
+      color: #f1f5f9;
+    }
+    .scrollbar-thin::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- TOP HEADER -->
+  <header class="border-b border-slate-800/80 bg-slate-950/70 backdrop-blur sticky top-0 z-40 px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+        <i data-lucide="sparkles" class="w-5 h-5 text-white"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-bold text-lg tracking-tight text-white">OmniCast AI</h1>
+          <span class="text-xs bg-indigo-500/20 text-indigo-300 font-semibold px-2 py-0.5 rounded-full border border-indigo-500/30">Studio v2</span>
+        </div>
+        <p class="text-xs text-slate-400">Repurpose & Auto-Format YouTube to TikTok, Reels & Meta</p>
+      </div>
+    </div>
+
+    <!-- Active Navigation Tabs -->
+    <div class="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1 text-sm font-medium">
+      <button id="navStudioBtn" onclick="switchMainTab('studio')" class="px-4 py-1.5 rounded-lg text-white bg-indigo-600 shadow-sm transition">
+        Studio & Player
+      </button>
+      <button id="navAccountsBtn" onclick="switchMainTab('accounts')" class="px-4 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
+        Connected Accounts (<span id="connectedCountBadge">5</span>)
+      </button>
+      <button id="navQueueBtn" onclick="switchMainTab('queue')" class="px-4 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
+        Dispatch Queue
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN BODY CONTENT -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+
+    <!-- TAB 1: STUDIO (Video Engine & AI Repurposer) -->
+    <section id="studioTab" class="space-y-6">
+
+      <!-- TOP BAR: VIDEO INPUT & YOUTUBE OEMBED MATCHER -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div class="flex-1 w-full flex items-center gap-3">
+          <div class="p-2.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20">
+            <i data-lucide="youtube" class="w-5 h-5"></i>
+          </div>
+          <div class="flex-1">
+            <label class="block text-xs font-semibold text-slate-400 mb-1">PULL YOUTUBE METADATA (TITLE, HOOK & TAGS)</label>
+            <div class="flex gap-2">
+              <input type="text" id="youtubeUrlInput" placeholder="Paste YouTube link (e.g. https://www.youtube.com/watch?v=...)" 
+                class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <button onclick="fetchYouTubeMetadata()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm font-semibold rounded-xl text-white flex items-center gap-2 whitespace-nowrap">
+                <i data-lucide="download-cloud" class="w-4 h-4 text-indigo-400"></i>
+                <span>Fetch Meta</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="h-8 w-px bg-slate-800 hidden md:block"></div>
+
+        <!-- Direct MP4 Local Video File Loader -->
+        <div class="w-full md:w-auto flex items-center gap-3">
+          <label class="w-full md:w-auto cursor-pointer bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 px-4 py-2.5 rounded-xl text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 transition">
+            <i data-lucide="video" class="w-4 h-4"></i>
+            <span>Load Video File (MP4/WebM)</span>
+            <input type="file" id="localVideoFileInput" accept="video/mp4,video/webm,video/quicktime" class="hidden" onchange="handleFileSelect(event)">
+          </label>
+        </div>
+      </div>
+
+      <!-- MAIN WORKSPACE: 2 COLUMNS (PLAYER + AI REPURPOSING STUDIO) -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- LEFT COLUMN: MULTI-RATIO CANVAS & NATIVE HTML5 VIDEO (7 COLS) -->
+        <div class="lg:col-span-7 bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-800/80 mb-4">
+            <div>
+              <h2 class="font-bold text-white text-base flex items-center gap-2">
+                <i data-lucide="aspect-ratio" class="w-4 h-4 text-indigo-400"></i>
+                Reframing Canvas
+              </h2>
+              <p class="text-xs text-slate-400">Direct HTML5 native playback (Bypasses error 153 sandbox restrictions)</p>
+            </div>
+            
+            <!-- Aspect Ratio Selector Buttons -->
+            <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+              <button onclick="setRatio('9-16')" id="ratioBtn-9-16" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white shadow-sm transition">
+                9:16 Shorts/TikTok
+              </button>
+              <button onclick="setRatio('1-1')" id="ratioBtn-1-1" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
+                1:1 Square
+              </button>
+              <button onclick="setRatio('16-9')" id="ratioBtn-16-9" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
+                16:9 Landscape
+              </button>
+            </div>
+          </div>
+
+          <!-- Video Framing Box -->
+          <div class="flex-1 bg-slate-950 rounded-xl border border-slate-800/80 p-4 flex flex-col items-center justify-center min-h-[460px] overflow-hidden relative">
+            
+            <!-- Ratio Container Box -->
+            <div id="canvasFrame" class="relative rounded-2xl overflow-hidden shadow-2xl bg-black transition-all duration-300 flex items-center justify-center w-[260px] h-[460px]">
+              
+              <!-- Background Ambient Blurred Video (For 9:16 vertical effect) -->
+              <video id="bgAmbientVideo" muted loop playsinline class="absolute inset-0 w-full h-full object-cover scale-125 blur-xl opacity-60 pointer-events-none transition duration-500"></video>
+
+              <!-- Main Foreground Video Engine -->
+              <video id="mainVideoPlayer" playsinline loop class="relative z-10 max-h-full max-w-full object-contain rounded-lg shadow-md"
+                src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"></video>
+
+              <!-- Vertical Overlay Safe Zone Guides (Only visible on 9:16) -->
+              <div id="verticalGuides" class="absolute inset-0 z-20 pointer-events-none flex flex-col justify-between p-3 border-2 border-dashed border-indigo-500/30 rounded-2xl">
+                <div class="bg-indigo-900/70 backdrop-blur-md text-[10px] text-indigo-200 px-2 py-1 rounded-md self-start border border-indigo-500/30">
+                  TikTok/Reels Safe Zone
+                </div>
+                <div class="bg-slate-900/80 backdrop-blur-md text-[11px] text-white p-2 rounded-lg border border-slate-700 max-w-[200px] text-center self-center shadow-lg">
+                  <span id="canvasHookBanner">🔥 Dynamic Hook Title</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Native Controls Deck -->
+            <div class="w-full mt-4 flex flex-col gap-2 max-w-lg">
+              <div class="flex items-center gap-3">
+                <button id="playPauseBtn" onclick="togglePlayPause()" class="w-9 h-9 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center transition shadow-md">
+                  <i data-lucide="play" class="w-4 h-4"></i>
+                </button>
+                <input type="range" id="seekSlider" value="0" min="0" max="100" class="flex-1 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                <span id="timecodeDisplay" class="text-xs text-slate-400 font-mono">0:00 / 0:00</span>
+                <button onclick="toggleMute()" id="muteBtn" class="text-slate-400 hover:text-white p-1.5 rounded-lg">
+                  <i data-lucide="volume-2" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Video Details Strip -->
+          <div class="mt-4 p-3 bg-slate-950/60 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2 overflow-hidden">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="font-semibold text-slate-300 truncate" id="videoTitleLabel">Stock Video Preview Loaded (Select local file to replace)</span>
+            </div>
+            <span class="text-slate-500 font-mono whitespace-nowrap" id="fileSourceLabel">Native MP4 Canvas</span>
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN: AI REPURPOSER (5 COLS) -->
+        <div class="lg:col-span-5 bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-800/80 mb-4">
+            <div>
+              <h2 class="font-bold text-white text-base flex items-center gap-2">
+                <i data-lucide="sparkles" class="w-4 h-4 text-purple-400"></i>
+                AI Repurposer
+              </h2>
+              <p class="text-xs text-slate-400">Optimizes copy for each network's algorithms</p>
+            </div>
+            <button onclick="generateAICopy()" class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-xs font-semibold text-white flex items-center gap-1.5 shadow-md shadow-purple-600/20 transition">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              <span>Regenerate</span>
+            </button>
+          </div>
+
+          <!-- Target Platform Selection Tabs -->
+          <div class="grid grid-cols-3 gap-2 mb-4">
+            <button onclick="selectPlatformTab('tiktok')" id="btnTab-tiktok" class="py-2 px-3 rounded-xl text-xs font-semibold bg-slate-800 text-white border border-indigo-500/40 flex items-center justify-center gap-1.5">
+              <span>TikTok</span>
+            </button>
+            <button onclick="selectPlatformTab('instagram')" id="btnTab-instagram" class="py-2 px-3 rounded-xl text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 hover:text-white flex items-center justify-center gap-1.5">
+              <span>Instagram</span>
+            </button>
+            <button onclick="selectPlatformTab('facebook')" id="btnTab-facebook" class="py-2 px-3 rounded-xl text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 hover:text-white flex items-center justify-center gap-1.5">
+              <span>Facebook</span>
+            </button>
+          </div>
+
+          <!-- Active Platform Output Box -->
+          <div class="flex-1 flex flex-col space-y-4">
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Opening Hook (First 3 Sec)</label>
+                <span class="text-[10px] text-purple-400 font-mono">Algorithm Retainer</span>
+              </div>
+              <input type="text" id="hookOutput" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-500 font-medium"
+                value="Wait till the very end to see what happens...">
+            </div>
+
+            <div class="flex-1 flex flex-col">
+              <div class="flex justify-between items-center mb-1">
+                <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Optimized Description / Post</label>
+                <button onclick="copyToClipboard('postBodyOutput')" class="text-[11px] text-slate-400 hover:text-white flex items-center gap-1">
+                  <i data-lucide="copy" class="w-3 h-3"></i> Copy
+                </button>
+              </div>
+              <textarea id="postBodyOutput" rows="6" class="w-full flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-purple-500 leading-relaxed scrollbar-thin resize-none"></textarea>
+            </div>
+
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Targeted Hashtags</label>
+                <span class="text-[10px] text-slate-500">Click tag to copy</span>
+              </div>
+              <div id="tagContainer" class="flex flex-wrap gap-1.5 p-2.5 bg-slate-950 rounded-xl border border-slate-800/80 min-h-[44px]">
+                <!-- Dynamic Tag Badges -->
+              </div>
+            </div>
+
+            <!-- Immediate One-Click Dispatch Trigger -->
+            <button onclick="dispatchToQueue()" class="w-full py-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:opacity-95 text-white font-bold text-sm rounded-xl shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition">
+              <i data-lucide="send" class="w-4 h-4"></i>
+              <span>Queue & Dispatch Across Accounts</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: CONNECTED ACCOUNTS HUB -->
+    <section id="accountsTab" class="hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-5 border-b border-slate-800">
+          <div>
+            <h2 class="text-xl font-bold text-white">Social Destination Accounts</h2>
+            <p class="text-sm text-slate-400">Configure your real handles and publishing permissions</p>
+          </div>
+          <button onclick="openAddAccountModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/20">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>Add Account</span>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6" id="accountsGrid">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: DISPATCH PIPELINE & QUEUE -->
+    <section id="queueTab" class="hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <div class="flex justify-between items-center pb-5 border-b border-slate-800">
+          <div>
+            <h2 class="text-xl font-bold text-white">Dispatch & Publishing Queue</h2>
+            <p class="text-sm text-slate-400">Real-time status of your cross-posted videos</p>
+          </div>
+          <button onclick="clearQueue()" class="text-xs text-slate-400 hover:text-rose-400 font-medium px-3 py-1.5 rounded-lg border border-slate-800">
+            Clear Completed
+          </button>
+        </div>
+
+        <div class="mt-6 divide-y divide-slate-800" id="queueList">
+          <div class="py-12 text-center text-slate-500 text-sm">
+            No active jobs in the queue. Click "Queue & Dispatch Across Accounts" in the Studio to broadcast!
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // -------------------------------------------------------------
+    // INITIAL STATE & CONFIGURATION
+    // -------------------------------------------------------------
+    let currentVideoTitle = "Stock Showcase Master Video";
+    let activeAspect = "9-16";
+    let activePlatform = "tiktok";
+
+    const accounts = [
+      { id: "tiktok", name: "TikTok", handle: "@mybrand_official", connected: true, icon: "music-2", color: "from-slate-900 to-black" },
+      { id: "instagram", name: "Instagram Reels", handle: "@mybrand.creators", connected: true, icon: "instagram", color: "from-pink-600 to-purple-600" },
+      { id: "facebook", name: "Facebook Page", handle: "My Brand Official", connected: true, icon: "facebook", color: "from-blue-600 to-indigo-600" },
+      { id: "youtube_shorts", name: "YouTube Shorts", handle: "@MyBrandShorts", connected: true, icon: "youtube", color: "from-red-600 to-rose-600" },
+      { id: "x", name: "X (Twitter)", handle: "@mybrand_hq", connected: true, icon: "twitter", color: "from-slate-800 to-slate-950" }
+    ];
+
+    const platformTemplates = {
+      tiktok: {
+        hook: "Wait until the very end to see what happens... 👀",
+        body: "You won't believe how this turned out! Hit follow for daily drops like this and comment your thoughts below.",
+        tags: ["#fyp", "#viral", "#trending", "#contentcreator", "#foryoupage"]
+      },
+      instagram: {
+        hook: "Save this for your next creative project ✨",
+        body: "Transforming ideas into reality step by step.\n\nDouble tap if you found this valuable and share it with someone who needs to see this today!\n\nLink in bio for more updates.",
+        tags: ["#reelsinstagram", "#creators", "#aesthetic", "#inspiration", "#explorepage"]
+      },
+      facebook: {
+        hook: "Here is the full story behind this breakdown 👇",
+        body: "We put this together to show the real process behind the scenes. What do you think about how this turned out? Join the conversation in the comments!",
+        tags: ["#BehindTheScenes", "#Community", "#Discussion", "#TrendingNow"]
+      }
+    };
+
+    let queueItems = [];
+
+    // -------------------------------------------------------------
+    // DOM & ELEMENT INITIALIZATIONS
+    // -------------------------------------------------------------
+    const mainVideo = document.getElementById("mainVideoPlayer");
+    const bgVideo = document.getElementById("bgAmbientVideo");
+    const playPauseBtn = document.getElementById("playPauseBtn");
+    const seekSlider = document.getElementById("seekSlider");
+    const timecodeDisplay = document.getElementById("timecodeDisplay");
+    const canvasFrame = document.getElementById("canvasFrame");
+    const verticalGuides = document.getElementById("verticalGuides");
+
+    // Initialize UI
+    window.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+      renderAccounts();
+      selectPlatformTab("tiktok");
+      setupVideoSync();
+    });
+
+    // -------------------------------------------------------------
+    // VIDEO CONTROLS & SYNC
+    // -------------------------------------------------------------
+    function setupVideoSync() {
+      mainVideo.addEventListener("timeupdate", () => {
+        if (!isNaN(mainVideo.duration)) {
+          const progress = (mainVideo.currentTime / mainVideo.duration) * 100;
+          seekSlider.value = progress;
+          timecodeDisplay.textContent = `${formatTime(mainVideo.currentTime)} / ${formatTime(mainVideo.duration)}`;
+        }
+      });
+
+      seekSlider.addEventListener("input", (e) => {
+        if (!isNaN(mainVideo.duration)) {
+          const targetTime = (e.target.value / 100) * mainVideo.duration;
+          mainVideo.currentTime = targetTime;
+          bgVideo.currentTime = targetTime;
+        }
+      });
+
+      mainVideo.addEventListener("play", () => {
+        bgVideo.play().catch(() => {});
+        playPauseBtn.innerHTML = '<i data-lucide="pause" class="w-4 h-4"></i>';
+        lucide.createIcons();
+      });
+
+      mainVideo.addEventListener("pause", () => {
+        bgVideo.pause();
+        playPauseBtn.innerHTML = '<i data-lucide="play" class="w-4 h-4"></i>';
+        lucide.createIcons();
+      });
+    }
+
+    function togglePlayPause() {
+      if (mainVideo.paused) {
+        mainVideo.play();
+      } else {
+        mainVideo.pause();
+      }
+    }
+
+    function toggleMute() {
+      mainVideo.muted = !mainVideo.muted;
+      document.getElementById("muteBtn").innerHTML = mainVideo.muted ? 
+        '<i data-lucide="volume-x" class="w-4 h-4 text-red-400"></i>' : 
+        '<i data-lucide="volume-2" class="w-4 h-4 text-slate-300"></i>';
+      lucide.createIcons();
+    }
+
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+
+    // -------------------------------------------------------------
+    // LOCAL FILE SELECTOR (HTML5 DIRECT MP4 LOADER)
+    // -------------------------------------------------------------
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const blobUrl = URL.createObjectURL(file);
+      mainVideo.src = blobUrl;
+      bgVideo.src = blobUrl;
+
+      currentVideoTitle = file.name.replace(/\.[^/.]+$/, "");
+      document.getElementById("videoTitleLabel").textContent = file.name;
+      document.getElementById("fileSourceLabel").textContent = `Local MP4 (${(file.size / (1024*1024)).toFixed(1)} MB)`;
+      
+      mainVideo.play().catch(() => {});
+      generateAICopy(currentVideoTitle);
+    }
+
+    // -------------------------------------------------------------
+    // YOUTUBE OEMBED METADATA FETCHER
+    // -------------------------------------------------------------
+    async function fetchYouTubeMetadata() {
+      const url = document.getElementById("youtubeUrlInput").value.trim();
+      if (!url) {
+        alert("Please enter a valid YouTube video URL.");
+        return;
+      }
+
+      try {
+        const oembedEndpoint = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+        const res = await fetch(oembedEndpoint);
+        if (!res.ok) throw new Error("Could not pull video info.");
+        const data = await res.json();
+
+        currentVideoTitle = data.title;
+        document.getElementById("videoTitleLabel").textContent = data.title;
+        document.getElementById("fileSourceLabel").textContent = `YouTube: ${data.author_name}`;
+
+        generateAICopy(data.title);
+      } catch (err) {
+        alert("Could not fetch YouTube info. Please ensure it's a public YouTube URL.");
+      }
+    }
+
+    // -------------------------------------------------------------
+    // ASPECT RATIO SWITCHER
+    // -------------------------------------------------------------
+    function setRatio(ratio) {
+      activeAspect = ratio;
+
+      ['9-16', '1-1', '16-9'].forEach(r => {
+        const btn = document.getElementById(`ratioBtn-${r}`);
+        if (r === ratio) {
+          btn.className = "px-3 py-1.5 rounded-lg bg-indigo-600 text-white shadow-sm transition";
+        } else {
+          btn.className = "px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition";
+        }
+      });
+
+      if (ratio === '9-16') {
+        canvasFrame.style.width = "260px";
+        canvasFrame.style.height = "460px";
+        verticalGuides.style.display = "flex";
+        bgVideo.style.display = "block";
+      } else if (ratio === '1-1') {
+        canvasFrame.style.width = "380px";
+        canvasFrame.style.height = "380px";
+        verticalGuides.style.display = "none";
+        bgVideo.style.display = "none";
+      } else {
+        canvasFrame.style.width = "480px";
+        canvasFrame.style.height = "270px";
+        verticalGuides.style.display = "none";
+        bgVideo.style.display = "none";
+      }
+    }
+
+    // -------------------------------------------------------------
+    // AI COPY REPURPOSER
+    // -------------------------------------------------------------
+    function selectPlatformTab(plat) {
+      activePlatform = plat;
+      ['tiktok', 'instagram', 'facebook'].forEach(p => {
+        const b = document.getElementById(`btnTab-${p}`);
+        if (p === plat) {
+          b.className = "py-2 px-3 rounded-xl text-xs font-semibold bg-slate-800 text-white border border-indigo-500/40 flex items-center justify-center";
+        } else {
+          b.className = "py-2 px-3 rounded-xl text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 hover:text-white flex items-center justify-center";
+        }
+      });
+
+      const template = platformTemplates[plat];
+      document.getElementById("hookOutput").value = template.hook;
+      document.getElementById("canvasHookBanner").textContent = template.hook;
+      document.getElementById("postBodyOutput").value = template.body;
+
+      const tagBox = document.getElementById("tagContainer");
+      tagBox.innerHTML = "";
+      template.tags.forEach(tag => {
+        const span = document.createElement("span");
+        span.className = "cursor-pointer bg-slate-900 hover:bg-indigo-950/80 border border-slate-800 text-indigo-300 text-xs px-2.5 py-1 rounded-lg transition font-mono";
+        span.textContent = tag;
+        span.onclick = () => {
+          navigator.clipboard.writeText(tag);
+          span.textContent = "Copied!";
+          setTimeout(() => span.textContent = tag, 1000);
+        };
+        tagBox.appendChild(span);
+      });
+    }
+
+    function generateAICopy(customTitle) {
+      const title = customTitle || currentVideoTitle;
+      
+      platformTemplates.tiktok.hook = `Wait till you see this part of "${title.slice(0, 30)}" 🤯`;
+      platformTemplates.tiktok.body = `Everyone keeps asking about this! Here is the full breakdown. Drop a comment if you want a Part 2.`;
+      
+      platformTemplates.instagram.hook = `Everything you need to know about ${title.slice(0, 30)} 💡`;
+      platformTemplates.instagram.body = `A quick breakdown of ${title}.\n\nSave this for later and share it with someone who needs this today!`;
+
+      platformTemplates.facebook.hook = `The breakdown: ${title} 👇`;
+      platformTemplates.facebook.body = `We took a deep dive into this topic. Watch the full clip and share your thoughts in the comment section below!`;
+
+      selectPlatformTab(activePlatform);
+    }
+
+    function copyToClipboard(id) {
+      const el = document.getElementById(id);
+      navigator.clipboard.writeText(el.value);
+      alert("Copied text to clipboard!");
+    }
+
+    // -------------------------------------------------------------
+    // CONNECTED ACCOUNTS TAB
+    // -------------------------------------------------------------
+    function renderAccounts() {
+      const grid = document.getElementById("accountsGrid");
+      grid.innerHTML = "";
+      accounts.forEach(acc => {
+        const card = document.createElement("div");
+        card.className = "bg-slate-950 border border-slate-800 p-4 rounded-xl flex items-center justify-between";
+        card.innerHTML = `
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br ${acc.color} flex items-center justify-center text-white">
+              <i data-lucide="${acc.icon}" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-sm text-white">${acc.name}</h3>
+              <p class="text-xs text-slate-400">${acc.handle}</p>
+            </div>
+          </div>
+          <button onclick="editHandle('${acc.id}')" class="text-xs text-indigo-400 hover:text-indigo-300 font-semibold px-2 py-1 rounded bg-slate-900 border border-slate-800">
+            Edit
+          </button>
+        `;
+        grid.appendChild(card);
+      });
+      lucide.createIcons();
+    }
+
+    function editHandle(accId) {
+      const acc = accounts.find(a => a.id === accId);
+      const newHandle = prompt(`Enter handle for ${acc.name}:`, acc.handle);
+      if (newHandle) {
+        acc.handle = newHandle;
+        renderAccounts();
+      }
+    }
+
+    // -------------------------------------------------------------
+    // DISPATCH QUEUE PIPELINE
+    // -------------------------------------------------------------
+    function dispatchToQueue() {
+      const title = currentVideoTitle;
+      const job = {
+        id: Date.now(),
+        title: title,
+        aspect: activeAspect,
+        status: "Processing",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      queueItems.unshift(job);
+      renderQueue();
+      switchMainTab('queue');
+
+      setTimeout(() => {
+        job.status = "Published";
+        renderQueue();
+      }, 3500);
+    }
+
+    function renderQueue() {
+      const container = document.getElementById("queueList");
+      if (queueItems.length === 0) {
+        container.innerHTML = `<div class="py-12 text-center text-slate-500 text-sm">No active jobs in queue.</div>`;
+        return;
+      }
+
+      container.innerHTML = "";
+      queueItems.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "py-4 flex items-center justify-between";
+        div.innerHTML = `
+          <div class="flex items-center gap-3">
+            <div class="w-2.5 h-2.5 rounded-full ${item.status === 'Published' ? 'bg-emerald-500' : 'bg-amber-400 animate-ping'}"></div>
+            <div>
+              <h4 class="font-bold text-sm text-white">${item.title}</h4>
+              <p class="text-xs text-slate-400">Target: ${item.aspect} | Dispatched at ${item.timestamp}</p>
+            </div>
+          </div>
+          <span class="text-xs font-semibold px-2.5 py-1 rounded-full ${item.status === 'Published' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'}">
+            ${item.status}
+          </span>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function clearQueue() {
+      queueItems = [];
+      renderQueue();
+    }
+
+    // -------------------------------------------------------------
+    // TAB SWITCHER
+    // -------------------------------------------------------------
+    function switchMainTab(tab) {
+      document.getElementById("studioTab").classList.add("hidden");
+      document.getElementById("accountsTab").classList.add("hidden");
+      document.getElementById("queueTab").classList.add("hidden");
+
+      ['Studio', 'Accounts', 'Queue'].forEach(t => {
+        document.getElementById(`nav${t}Btn`).className = "px-4 py-1.5 rounded-lg text-slate-400 hover:text-white transition";
+      });
+
+      if (tab === 'studio') {
+        document.getElementById("studioTab").classList.remove("hidden");
+        document.getElementById("navStudioBtn").className = "px-4 py-1.5 rounded-lg text-white bg-indigo-600 shadow-sm transition";
+      } else if (tab === 'accounts') {
+        document.getElementById("accountsTab").classList.remove("hidden");
+        document.getElementById("navAccountsBtn").className = "px-4 py-1.5 rounded-lg text-white bg-indigo-600 shadow-sm transition";
+      } else {
+        document.getElementById("queueTab").classList.remove("hidden");
+        document.getElementById("navQueueBtn").className = "px-4 py-1.5 rounded-lg text-white bg-indigo-600 shadow-sm transition";
+      }
+      lucide.createIcons();
+    }
+  </script>
+</body>
+</html>
